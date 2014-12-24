@@ -1,0 +1,153 @@
+---
+title: "Regression Fast"
+author: "Jerad Acosta"
+date: "December 21, 2014"
+output: pdf_document
+---
+
+# Executive Summary
+
+We are analyzing the **mtcars** dataset from the R library package **datasets** in search of an effect on fuel consumption as any relationship ofa product of variables.  
+In particularly, we are trying to decide whether or not an Automatic transmission **AT** has a statistically significant amount of impage on **mpg** over that of a manual transmission **MT**
+
+The conclusion of the analysis was that Manual transmissions **MT** do infact have a statistically significant increase in Miles Per Gallon **mpg** when compared to an Automatic Transmission **AT** - all other variables held aside.
+We also discovered, however, that transmission alone could not account for whether one car would have an increase or decrease in **mpg**. This 
+
+# Analysis
+
+```{r loadData, echo=FALSE, results='hide'}
+    # Load mtcars dataset from R pacakage datasets
+    library(datasets)
+    data <- mtcars
+```
+
+## Data Exploration
+
+Calculating the correlation coefficients among the features we see high correlation, both positive and negative between MPG and number of other features.  
+
+```{r, echo=FALSE, results='markup'}
+    options(width=100)
+    dataCor <- cor(data)
+    mpgCorr <- dataCor["mpg", colnames(dataCor) != "mpg"]
+    sort(mpgCorr)
+```
+
+[Refer Appendix A - Figure 1 for a visual representation.]  This suggests that transmission type by itself may not be a good model to predict fuel efficiency.
+
+## Basic Model
+
+First, we built a Basic linear model using transmission type as the only predictor of fuel efficiency.  [Refer to Basic Model Summary in the Appendix B for model details.] 
+
+```{r fastModel, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+    fastFit <- lm(mpg ~ am, data=mtcars)
+```
+```{r fastSummary, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+    fastSummary <- summary(fastFit)
+```
+
+Examining this model we see that the average the fuel efficiency for a car with an AT is `r round(fastSummary$coeff[, 1][1], digits=2)` **MPG** and that with a **MT** will get approximately `r round(fastSummary$coeff[, 1][2], digits=2)` more **MPG**.  [Refer to Appendix A - Figure 2 for a visual representation.]  *Both coefficients have significant p-values (p < 0.05)* as we would expect, knowing there is a strong correlation between MPG and transmission type.  The model F-statistic is significant (p < 0.05); however, *the overall model fit is poor with an R-Squared value of `r round(fastSummary$r.squared, digits=3)`.*
+
+## Multivariate Model
+
+Next, we built a more complex multivariate model which included all the variables that we found to be highly correlated to fuel efficiency during initial data exploration.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+    multiFit <- lm(mpg ~ cyl + disp + hp + wt + drat + vs + am + carb, data=mtcars)
+```
+```{r complexSummary, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+    multiSummary <- summary(multiFit)
+```
+
+From this model we see a much better fit with an *R-squared value of `r round(multiSummary$r.squared, digits=3)`;* however, the model contains many features which are **not significant** (p > 0.05).
+
+## Optimized Model
+
+Knowing this, we used the AIC Stepwise algorithm to build an an optimized model, using the multivariate model as the starting point.  [Refer to Optimized Model Summary in the  Appendix B for model details.]
+
+```{r optiModel, cache=TRUE, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+    bestFit <- step(multiFit, direction="backward")
+```
+```{r optiSummary, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+    bestSummary <- summary(bestFit)
+```
+
+Examining the optimized model we see that a significant number of variables have been removed and now includes only number of cylinders, horsepower, and weight as features. The optimized model exhibits a slightly better fit with an **R-squared value of `r round(summary(bestFit)$r.squared, digits=3)`  and a more signicant F-statistic**.  Of the features remaining in the model, only wieght has a significant p-value (p < 0.05).  The *number of cylinders and horsepower are not significant* (p > 0.05); however, their inclusion improves the fit of the model, i.e., higher R-squared and lower F-statistic p-value.  
+
+## Final Model
+
+Lastly, because the main objective of this analysis is to determine a relationship between transmission type and fuel efficiency we want our final model to include transmission type as a feature. To do this we examined the output of the AIC Stepwise Algorithm to determine the best predictive model including transmission type as a feature.  [Refer to Final Model Summary in the Appendix for model details.]
+
+```{r finalModel, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+    finalFit <- lm(mpg ~ am + wt + cyl + hp, data=mtcars)
+```
+```{r finalSummary, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+    finalSummary <- summary(finalFit)
+```
+
+Examining our final model we see that weight remains as the only significant feature, and the R-squared value and F-statistic significance are only slightly worse than in the optimized model.    
+
+Havning finalized out model, we examined the residuals of the to verify the validity of the model.  [Refer to Appendix A - Figure 3 visual summary.]  The plots show that the model supports our assumptions of independence and normality of the data with no heteroskedasticity and no inflential outliers. 
+
+* The "Residuals vs Fitted" plot verifies the independance assumption as the points are randomly scattered above and below the zero line.
+* The "Normal Q-Q"" plot verifies that the residuals are normally distributed as the points hug the line closely.
+* The "Scale-Location" plot verifies the constant variance assumption as the points fall in a constant band displaying no heteroskedasticity.
+* The "Residuals vs Leverage" plot indicates all points are within Cook's distance, verifying there are no influential outliers.
+
+# Conclusion
+
+**MTs have greater fuel efficiency than ATs** *when ignoring the confounding features of weight, number of cyclinders, and horsepower.*  The average **MT gets `r round(fastSummary$coeff[, 1][2], digits=2)` more MPG** than the average AT at `r round(fastSummary$coeff[, 1][1], digits=2)` MPG.  
+
+# Appendix A - Figures
+
+```{r exploreCorrelation, echo=FALSE, fig.cap='MT Car Data Correlation Scatter Matrix', fig.height=6, fig.width=8, warning=FALSE, message=FALSE}
+
+    # Method 1:
+    library(graphics)
+    pairs(mtcars, main="Motor Trend Car Data Correlation")
+    # Method 2:
+    library(car)
+    scatterplot.matrix(mtcars, main="Motor Trend Car Data Correlation")
+
+    # Method 3:
+    library(gclus)
+    data.r <- abs(cor(data))
+    data.col <- dmat.color(data.r, colors=c("yellow", "green", "red"))
+    cpairs(data, panel.colors=data.col, lower.panel=NULL, main="Figure 1: Feature Correlation")
+    legend(0.05, 0.25, legend=as.vector(c("High Correlation (> 0.8)", "Moderate Correlation (> 0.6)", "Low Correlation")), fill=c("red", "yellow", "green"))
+```
+
+```{r fastViz, cache=TRUE, echo=FALSE, fig.cap='fast Linear Regression Model', fig.width=8, fig.height=2.5, eval=TRUE, warning=FALSE, message=FALSE}
+    library(ggplot2)
+    qplot(am, mpg, data=mtcars) + 
+    geom_smooth(method="lm") + 
+    scale_y_continuous("Fuel Efficiency (MPG)") +
+    scale_x_continuous("Transmission Type", breaks=c(-0.25, 0, 1, 1.25), labels=c("", "AT", "MT", "")) +
+    ggtitle("Figure 2: Basic Linear Model") + 
+        theme(plot.title = element_text(face="bold"))
+```
+
+```{r residualExam, cache=FALSE, echo=FALSE, fig.cap='Residual Plots', fig.width=8, fig.height=2.5, warning=FALSE, message=FALSE}
+    par(mfrow=c(1, 4), oma=c(0.5, 0, 1.5, 0), font=2)
+    plot(finalFit, sub.caption="Figure 3: Residual Diagnostics")
+```
+
+# Appendix B - Models
+
+## Basic Model Summary
+
+```{r displayBasic, cache=TRUE, echo=FALSE, results='markup'}
+    fastSummary
+```
+
+## Optimized Model Summary
+
+```{r displayBest, cache=TRUE, echo=FALSE, results='markup'}
+    bestSummary
+```
+
+## Final Model Summary
+
+```{r displayFinal, cache=TRUE, echo=FALSE, results='markup'}
+    finalSummary
+```
+
